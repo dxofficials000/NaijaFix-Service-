@@ -1,0 +1,24 @@
+{
+  "name": "NaijaFix - Hire Trusted Artisans",
+  "short_name": "NaijaFix",
+  "description": "Connect directly with verified local professionals and artisans across Nigeria via WhatsApp.",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#0b0f17",
+  "theme_color": "#008751",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "afcon.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "afcon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
