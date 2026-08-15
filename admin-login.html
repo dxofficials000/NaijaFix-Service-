@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin Login — NaijaFix</title>
+<link rel="stylesheet" href="style.css">
+<style>
+  .auth-wrap {
+    max-width: 400px;
+    margin: 80px auto;
+    padding: 24px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 14px;
+  }
+  .auth-wrap h2 { margin-bottom: 1rem; }
+  .auth-wrap input {
+    width: 100%;
+    padding: 12px;
+    margin-bottom: 12px;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    background: #0b0f17;
+    color: #fff;
+  }
+  .auth-wrap button {
+    width: 100%;
+    padding: 12px;
+    background: var(--green-primary);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  #authMsg { color: #ff6b6b; font-size: 0.9rem; margin-bottom: 10px; min-height: 1.2em; }
+</style>
+</head>
+<body>
+
+<div class="auth-wrap">
+  <h2>Admin Login</h2>
+  <div id="authMsg"></div>
+  <input type="email" id="email" placeholder="Admin email" />
+  <input type="password" id="password" placeholder="Password (min 6 characters)" />
+  <button id="submitBtn">Log In</button>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script>
+  const ADMIN_EMAIL = "dxofficials000@gmail.com";
+  const authMsg = document.getElementById("authMsg");
+  const submitBtn = document.getElementById("submitBtn");
+
+  auth.onAuthStateChanged(user => {
+    if (user && user.email === ADMIN_EMAIL) {
+      window.location.href = "admin-dashboard.html";
+    }
+  });
+
+  submitBtn.addEventListener("click", async () => {
+    const email = document.getElementById("email").value.trim();
+    const password = document.getElementById("password").value;
+    authMsg.innerText = "";
+
+    if (!email || !password) {
+      authMsg.innerText = "Please fill in both fields.";
+      return;
+    }
+
+    submitBtn.disabled = true;
+    submitBtn.innerText = "Please wait...";
+
+    try {
+      // Try logging in first
+      await auth.signInWithEmailAndPassword(email, password);
+    } catch (err) {
+      // If account doesn't exist yet, create it — but only for the admin email
+      if (err.code === "auth/user-not-found" || err.code === "auth/invalid-credential") {
+        if (email !== ADMIN_EMAIL) {
+          authMsg.innerText = "Access denied. This is not an admin account.";
+          submitBtn.disabled = false;
+          submitBtn.innerText = "Log In";
+          return;
+        }
+        try {
+          await auth.createUserWithEmailAndPassword(email, password);
+        } catch (createErr) {
+          authMsg.innerText = createErr.message;
+          submitBtn.disabled = false;
+          submitBtn.innerText = "Log In";
+          return;
+        }
+      } else {
+        authMsg.innerText = err.message;
+        submitBtn.disabled = false;
+        submitBtn.innerText = "Log In";
+        return;
+      }
+    }
+
+    if (auth.currentUser.email !== ADMIN_EMAIL) {
+      authMsg.innerText = "Access denied. This account is not authorized as admin.";
+      await auth.signOut();
+      submitBtn.disabled = false;
+      submitBtn.innerText = "Log In";
+      return;
+    }
+
+    window.location.href = "admin-dashboard.html";
+  });
+</script>
+
+</body>
+</html>
