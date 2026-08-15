@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>My Listing — NaijaFix</title>
+<link rel="stylesheet" href="style.css">
+<style>
+  .dash-wrap {
+    max-width: 480px;
+    margin: 30px auto;
+    padding: 20px;
+  }
+  .dash-wrap h2 { margin-bottom: 1rem; }
+  .dash-wrap input, .dash-wrap textarea, .dash-wrap select {
+    width: 100%;
+    padding: 12px;
+    margin-bottom: 12px;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    background: #0b0f17;
+    color: #fff;
+  }
+  .dash-wrap button {
+    padding: 12px 20px;
+    background: var(--green-primary);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .dash-wrap button:disabled { opacity: 0.5; }
+  #logoutBtn { background: #333; margin-bottom: 20px; }
+  #saveMsg { min-height: 1.2em; margin-bottom: 10px; font-size: 0.9rem; }
+  #saveMsg.success { color: #6dfca0; }
+  #saveMsg.error { color: #ff6b6b; }
+
+  .photo-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+  .photo-slot {
+    aspect-ratio: 1;
+    background: var(--bg-card);
+    border: 1px dashed var(--border-color);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
+    font-size: 1.5rem;
+    color: var(--text-muted);
+  }
+  .photo-slot img { width: 100%; height: 100%; object-fit: cover; }
+  .photo-slot .remove-btn {
+    position: absolute; top: 2px; right: 2px;
+    background: rgba(0,0,0,0.7); color: #fff;
+    border: none; border-radius: 50%;
+    width: 20px; height: 20px; font-size: 12px; cursor: pointer;
+  }
+  #photoInput { display: none; }
+  .photo-count { font-size: 0.85rem; color: var(--text-muted); margin-bottom: 10px; }
+</style>
+</head>
+<body>
+
+<div class="dash-wrap">
+  <button id="logoutBtn">Log Out</button>
+  <h2>My Listing</h2>
+  <div id="saveMsg"></div>
+
+  <label>Photos (up to 7)</label>
+  <div class="photo-count"><span id="photoCountText">0</span> / 7 uploaded</div>
+  <div class="photo-grid" id="photoGrid"></div>
+  <input type="file" id="photoInput" accept="image/*" />
+  <button type="button" id="addPhotoBtn">+ Add Photo</button>
+
+  <br><br>
+  <input type="text" id="name" placeholder="Full name" />
+  <select id="category">
+    <option value="">Select category</option>
+    <option>Electrician</option>
+    <option>Plumber</option>
+    <option>Tailor / Fashion</option>
+    <option>Laundry</option>
+    <option>Mechanic</option>
+    <option>AC / Generator Repair</option>
+    <option>Hairdresser / Barber</option>
+    <option>Other</option>
+  </select>
+  <input type="text" id="location" placeholder="Location (e.g. Ikeja, Lagos)" />
+  <input type="tel" id="phone" placeholder="WhatsApp number (e.g. 2348012345678)" />
+  <textarea id="description" rows="4" placeholder="Describe your work/services"></textarea>
+
+  <button id="saveBtn">Save My Listing</button>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script>
+  const IMGBB_API_KEY = "22f235263ce4bf4503117ac75b892ec1";
+  const MAX_PHOTOS = 7;
+
+  let currentUser = null;
+  let photos = []; // array of image URLs
+
+  const photoGrid = document.getElementById("photoGrid");
+  const photoCountText = document.getElementById("photoCountText");
+  const photoInput = document.getElementById("photoInput");
+  const addPhotoBtn = document.getElementById("addPhotoBtn");
+  const saveMsg = document.getElementById("saveMsg");
+  const saveBtn = document.getElementById("saveBtn");
+
+  // ---------- Auth guard ----------
+  auth.onAuthStateChanged(async user => {
+    if (!user) {
+      window.location.href = "artisan-login.html";
+      return;
+    }
+    currentUser = user;
+    await loadProfile();
+  });
+
+  document.getElementById("logoutBtn").addEventListener("click", async () => {
+    await auth.signOut();
+    window.location.href = "artisan-login.html";
+  });
+
+  // ---------- Load existing profile ----------
+  async function loadProfile() {
+    const doc = await db.collection("artisans").doc(currentUser.uid).get();
+    if (doc.exists) {
+      const data = doc.data();
+      document.getElementById("name").value = data.name || "";
+      document.getElementById("category").value = data.category || "";
+      document.getElementById("location").value = data.location || "";
+      document.getElementById("phone").value = data.phone || "";
+      document.getElementById("description").value = data.description || "";
+      photos = data.images || [];
+      renderPhotoGrid();
+    }
+  }
+
+  // ---------- Photo grid rendering ----------
+  function renderPhotoGrid() {
+    photoGrid.innerHTML = "";
+    photos.forEach((url, i) => {
+      const slot = document.createElement("div");
+      slot.className = "photo-slot";
+      slot.innerHTML = `<img src="${url}"><button class="remove-btn" data-i="${i}">✕</button>`;
+      photoGrid.appendChild(slot);
+    });
+    photoCountText.innerText = photos.length;
+    addPhotoBtn.disabled = photos.length >= MAX_PHOTOS;
+    addPhotoBtn.innerText = photos.length >= MAX_PHOTOS ? "Max 7 photos reached" : "+ Add Photo";
+
+    photoGrid.querySelectorAll(".remove-btn").forEach(btn => {
+      btn.addEventListener("click", (e) => {
+        const i = parseInt(e.target.getAttribute("data-i"));
+        photos.splice(i, 1);
+        renderPhotoGrid();
+      });
+    });
+  }
+
+  // ---------- Upload flow ----------
+  addPhotoBtn.addEventListener("click", () => {
+    if (photos.length >= MAX_PHOTOS) return;
+    photoInput.click();
+  });
+
+  photoInput.addEventListener("change", async () => {
+    const file = photoInput.files[0];
+    if (!file) return;
+
+    addPhotoBtn.disabled = true;
+    addPhotoBtn.innerText = "Uploading...";
+
+    try {
+      const formData = new FormData();
+      formData.append("image", file);
+
+      const res = await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`, {
+        method: "POST",
+        body: formData
+      });
+      const data = await res.json();
+
+      if (data.success) {
+        photos.push(data.data.url);
+        renderPhotoGrid();
+      } else {
+        alert("Photo upload failed. Please try again.");
+      }
+    } catch (err) {
+      alert("Network error uploading photo. Please check your connection.");
+      console.error(err);
+    } finally {
+      photoInput.value = "";
+      addPhotoBtn.disabled = photos.length >= MAX_PHOTOS;
+      addPhotoBtn.innerText = photos.length >= MAX_PHOTOS ? "Max 7 photos reached" : "+ Add Photo";
+    }
+  });
+
+  // ---------- Save profile ----------
+  saveBtn.addEventListener("click", async () => {
+    const name = document.getElementById("name").value.trim();
+    const category = document.getElementById("category").value;
+    const location = document.getElementById("location").value.trim();
+    const phone = document.getElementById("phone").value.trim();
+    const description = document.getElementById("description").value.trim();
+
+    if (!name || !category || !location || !phone) {
+      saveMsg.className = "error";
+      saveMsg.innerText = "Please fill in name, category, location, and phone number.";
+      return;
+    }
+
+    saveBtn.disabled = true;
+    saveBtn.innerText = "Saving...";
+
+    try {
+      await db.collection("artisans").doc(currentUser.uid).set({
+        name, category, location, phone, description,
+        images: photos,
+        image: photos[0] || "" // first photo used as the main listing image
+      }, { merge: true });
+
+      // Notify admin that this artisan posted/updated their listing
+      await db.collection("notifications").add({
+        message: `${name} (${category}) updated their listing.`,
+        artisanId: currentUser.uid,
+        read: false,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+
+      saveMsg.className = "success";
+      saveMsg.innerText = "Saved! Your listing is updated.";
+    } catch (err) {
+      saveMsg.className = "error";
+      saveMsg.innerText = "Something went wrong saving your listing: " + err.message;
+    } finally {
+      saveBtn.disabled = false;
+      saveBtn.innerText = "Save My Listing";
+    }
+  });
+</script>
+
+</body>
+</html>
