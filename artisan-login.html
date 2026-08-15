@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Artisan Login — NaijaFix</title>
+<link rel="stylesheet" href="style.css">
+<style>
+  .auth-wrap {
+    max-width: 400px;
+    margin: 60px auto;
+    padding: 24px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 14px;
+  }
+  .auth-wrap h2 { margin-bottom: 1rem; }
+  .auth-wrap input {
+    width: 100%;
+    padding: 12px;
+    margin-bottom: 12px;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    background: #0b0f17;
+    color: #fff;
+  }
+  .auth-wrap button {
+    width: 100%;
+    padding: 12px;
+    background: var(--green-primary);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    font-weight: 700;
+    cursor: pointer;
+    margin-bottom: 10px;
+  }
+  .auth-toggle { text-align: center; color: var(--text-muted); font-size: 0.9rem; }
+  .auth-toggle a { color: var(--green-primary); cursor: pointer; }
+  #authMsg { color: #ff6b6b; font-size: 0.9rem; margin-bottom: 10px; min-height: 1.2em; }
+</style>
+</head>
+<body>
+
+<div class="auth-wrap">
+  <h2 id="formTitle">Artisan Sign Up</h2>
+  <div id="authMsg"></div>
+  <input type="email" id="email" placeholder="Email address" />
+  <input type="password" id="password" placeholder="Password (min 6 characters)" />
+  <button id="submitBtn">Sign Up</button>
+  <div class="auth-toggle">
+    <span id="toggleText">Already registered?</span>
+    <a id="toggleLink">Log in</a>
+  </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script>
+  let isSignup = true;
+
+  const formTitle = document.getElementById("formTitle");
+  const submitBtn = document.getElementById("submitBtn");
+  const toggleText = document.getElementById("toggleText");
+  const toggleLink = document.getElementById("toggleLink");
+  const authMsg = document.getElementById("authMsg");
+
+  toggleLink.addEventListener("click", () => {
+    isSignup = !isSignup;
+    formTitle.innerText = isSignup ? "Artisan Sign Up" : "Artisan Login";
+    submitBtn.innerText = isSignup ? "Sign Up" : "Log In";
+    toggleText.innerText = isSignup ? "Already registered?" : "New artisan?";
+    toggleLink.innerText = isSignup ? "Log in" : "Sign up";
+    authMsg.innerText = "";
+  });
+
+  // If already logged in, skip straight to dashboard
+  auth.onAuthStateChanged(user => {
+    if (user) window.location.href = "artisan-dashboard.html";
+  });
+
+  submitBtn.addEventListener("click", async () => {
+    const email = document.getElementById("email").value.trim();
+    const password = document.getElementById("password").value;
+    authMsg.innerText = "";
+
+    if (!email || !password) {
+      authMsg.innerText = "Please fill in both fields.";
+      return;
+    }
+
+    submitBtn.disabled = true;
+    submitBtn.innerText = "Please wait...";
+
+    try {
+      if (isSignup) {
+        const cred = await auth.createUserWithEmailAndPassword(email, password);
+        // Create an empty profile document for this artisan, keyed by their uid
+        await db.collection("artisans").doc(cred.user.uid).set({
+          name: "",
+          category: "",
+          location: "",
+          description: "",
+          phone: "",
+          images: [],
+          verified: false,
+          active: true,
+          featured: false,
+          rating: 0,
+          reviewsCount: 0,
+          createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+      } else {
+        await auth.signInWithEmailAndPassword(email, password);
+      }
+      window.location.href = "artisan-dashboard.html";
+    } catch (err) {
+      authMsg.innerText = err.message;
+      submitBtn.disabled = false;
+      submitBtn.innerText = isSignup ? "Sign Up" : "Log In";
+    }
+  });
+</script>
+
+</body>
+</html>
