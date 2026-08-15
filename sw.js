@@ -1,4 +1,4 @@
-const CACHE_NAME = 'naijafix-v4.2';
+const CACHE_NAME = 'naijafix-v4.3';
 const urlsToCache = [
   './',
   './index.html',
