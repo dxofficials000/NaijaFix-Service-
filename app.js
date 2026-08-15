@@ -1,0 +1,278 @@
+document.addEventListener('DOMContentLoaded', () => {
+  setupNavigation();
+  initRotatingBanner();
+  initHomePage();
+  initDirectoryPage();
+  initServiceWorker();
+});
+
+// Register Service Worker for PWA Offline Caching & Push Notifications
+function initServiceWorker() {
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/sw.js')
+        .then(reg => {
+          console.log('NaijaFix Service Worker registered successfully:', reg.scope);
+        })
+        .catch(err => {
+          console.log('NaijaFix Service Worker registration failed:', err);
+        });
+    });
+  }
+}
+
+function setupNavigation() {
+  const hamburgerBtn = document.getElementById('hamburgerBtn');
+  const closeBtn = document.getElementById('closeBtn');
+  const navDrawer = document.getElementById('navDrawer');
+
+  if (hamburgerBtn && navDrawer) {
+    hamburgerBtn.addEventListener('click', () => navDrawer.classList.add('open'));
+  }
+
+  if (closeBtn && navDrawer) {
+    closeBtn.addEventListener('click', () => navDrawer.classList.remove('open'));
+  }
+}
+
+function initRotatingBanner() {
+  const bannerSlider = document.getElementById('bannerSlider');
+  if (!bannerSlider) return;
+
+  const banners = dprosDatabase.getBanners();
+  if (!banners || banners.length === 0) return;
+
+  bannerSlider.innerHTML = banners.map((banner, index) => `
+    <div class="banner-slide ${index === 0 ? 'active' : ''}">
+      ${banner.image && banner.image.trim() !== "" 
+        ? `<img src="${banner.image}" alt="${banner.name}" class="banner-bg-img">` 
+        : `<div class="banner-bg-placeholder"><span>📷 Rotating Sponsor Banner Placeholder</span></div>`
+      }
+      <div class="banner-content-overlay">
+        <span class="banner-tag">Featured Sponsor</span>
+        <h3>${banner.name}</h3>
+        <p>${banner.category} • 📍 ${banner.location}</p>
+      </div>
+      <a href="https://wa.me/${OWNER_WHATSAPP}?text=${encodeURIComponent('Hi NaijaFix, I\'m interested in ' + banner.name + ' (' + banner.category + ', ' + banner.location + ')')}" class="banner-contact-btn" target="_blank">Chat on WhatsApp</a>
+    </div>
+  `).join('');
+
+  let currentSlide = 0;
+  const slides = bannerSlider.querySelectorAll('.banner-slide');
+
+  if (slides.length > 1) {
+    setInterval(() => {
+      slides[currentSlide].classList.remove('active');
+      currentSlide = (currentSlide + 1) % slides.length;
+      slides[currentSlide].classList.add('active');
+    }, 4000);
+  }
+}
+
+// Combine static artisans (data.js) with live artisan listings from
+// Firestore (submitted by artisans through artisan-dashboard.html).
+// Falls back to static-only data if Firestore is unreachable.
+async function getAllArtisans() {
+  const staticArtisans = dprosDatabase.getArtisans();
+
+  if (typeof db === 'undefined') {
+    return staticArtisans;
+  }
+
+  try {
+    const snapshot = await db.collection('artisans').get();
+    const liveArtisans = [];
+
+    snapshot.forEach(doc => {
+      const a = doc.data();
+      // Skip empty/incomplete profiles (e.g. signed up but never filled the form)
+      // and skip anything the admin has deactivated
+      if (!a.name || !a.category || a.active === false) return;
+
+      liveArtisans.push({
+        id: doc.id,
+        name: a.name,
+        category: a.category,
+        location: a.location || '',
+        description: a.description || '',
+        phone: a.phone || '',
+        image: a.image || '',
+        images: a.images || [],
+        verified: a.verified === true,
+        featured: a.featured === true,
+        active: a.active !== false,
+        rating: a.rating || 0,
+        reviewsCount: a.reviewsCount || 0
+      });
+    });
+
+    return [...staticArtisans, ...liveArtisans];
+  } catch (err) {
+    console.error('NaijaFix: could not load live listings, showing static listings only.', err);
+    return staticArtisans;
+  }
+}
+
+function initHomePage() {
+  const featuredGrid = document.getElementById('featuredGrid');
+  const categoryScroll = document.getElementById('categoryScroll');
+  const homeSearchBtn = document.getElementById('homeSearchBtn');
+  const homeSearchInput = document.getElementById('homeSearchInput');
+
+  if (!featuredGrid) return; 
+
+  const categories = dprosDatabase.getCategories();
+
+  if (categoryScroll) {
+    categoryScroll.innerHTML = categories.map((cat, index) => `
+      <button class="category-chip ${index === 0 ? 'active' : ''}" data-category="${cat}">
+        ${cat}
+      </button>
+    `).join('');
+
+    categoryScroll.querySelectorAll('.category-chip').forEach(chip => {
+      chip.addEventListener('click', (e) => {
+        categoryScroll.querySelectorAll('.category-chip').forEach(c => c.classList.remove('active'));
+        e.target.classList.add('active');
+        renderFilteredFeatured(e.target.getAttribute('data-category'));
+      });
+    });
+  }
+
+  renderFilteredFeatured("All Categories");
+
+  if (homeSearchBtn && homeSearchInput) {
+    homeSearchBtn.addEventListener('click', () => {
+      const query = homeSearchInput.value.trim();
+      window.location.href = query ? `search.html?q=${encodeURIComponent(query)}` : `search.html`;
+    });
+
+    homeSearchInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') homeSearchBtn.click();
+    });
+  }
+}
+
+async function renderFilteredFeatured(category) {
+  const featuredGrid = document.getElementById('featuredGrid');
+  if (!featuredGrid) return;
+
+  const artisans = await getAllArtisans();
+  // Filter for active & featured professionals
+  let filtered = artisans.filter(a => a.featured === true && a.active !== false);
+
+  if (category !== "All Categories") {
+    filtered = filtered.filter(a => a.category.toLowerCase() === category.toLowerCase());
+  }
+
+  renderArtisanGrid(featuredGrid, filtered, "No featured professionals found in this category.");
+}
+
+function initDirectoryPage() {
+  const directoryGrid = document.getElementById('directoryGrid');
+  const dirCategoryScroll = document.getElementById('dirCategoryScroll');
+  const dirSearchBtn = document.getElementById('dirSearchBtn');
+  const dirSearchInput = document.getElementById('dirSearchInput');
+
+  if (!directoryGrid) return;
+
+  const categories = dprosDatabase.getCategories();
+  let currentCategory = "All Categories";
+  let searchQuery = "";
+
+  const urlParams = new URLSearchParams(window.location.search);
+  const qParam = urlParams.get('q');
+  if (qParam && dirSearchInput) {
+    searchQuery = qParam.toLowerCase();
+    dirSearchInput.value = qParam;
+  }
+
+  if (dirCategoryScroll) {
+    dirCategoryScroll.innerHTML = categories.map((cat, index) => `
+      <button class="category-chip ${index === 0 ? 'active' : ''}" data-category="${cat}">
+        ${cat}
+      </button>
+    `).join('');
+
+    dirCategoryScroll.querySelectorAll('.category-chip').forEach(chip => {
+      chip.addEventListener('click', (e) => {
+        dirCategoryScroll.querySelectorAll('.category-chip').forEach(c => c.classList.remove('active'));
+        e.target.classList.add('active');
+        currentCategory = e.target.getAttribute('data-category');
+        applyDirectoryFilters();
+      });
+    });
+  }
+
+  if (dirSearchBtn && dirSearchInput) {
+    dirSearchBtn.addEventListener('click', () => {
+      searchQuery = dirSearchInput.value.trim().toLowerCase();
+      applyDirectoryFilters();
+    });
+
+    dirSearchInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') dirSearchBtn.click();
+    });
+  }
+
+  async function applyDirectoryFilters() {
+    const artisans = await getAllArtisans();
+    // Only show active artisans in the directory
+    let filtered = artisans.filter(a => a.active !== false);
+
+    if (currentCategory !== "All Categories") {
+      filtered = filtered.filter(a => a.category.toLowerCase() === currentCategory.toLowerCase());
+    }
+
+    if (searchQuery !== "") {
+      filtered = filtered.filter(a => 
+        a.name.toLowerCase().includes(searchQuery) || 
+        a.category.toLowerCase().includes(searchQuery) || 
+        a.location.toLowerCase().includes(searchQuery) || 
+        a.description.toLowerCase().includes(searchQuery)
+      );
+    }
+
+    renderArtisanGrid(directoryGrid, filtered, "No professionals matched your search criteria.");
+  }
+
+  applyDirectoryFilters();
+}
+
+// All customer WhatsApp contact goes through the platform owner's number,
+// never the artisan's own number directly — this keeps every conversation
+// routed through NaijaFix admin.
+const OWNER_WHATSAPP = '2349135580184';
+
+function renderArtisanGrid(container, artisans, emptyMessage) {
+  if (artisans.length === 0) {
+    container.innerHTML = `<p style="color: var(--text-muted); grid-column: 1/-1; text-align: center; padding: 2rem;">${emptyMessage}</p>`;
+    return;
+  }
+
+  container.innerHTML = artisans.map(artisan => `
+    <div class="artisan-card">
+      <div class="artisan-img-wrapper">
+        ${artisan.image && artisan.image.trim() !== "" 
+          ? `<img src="${artisan.image}" alt="${artisan.name}">` 
+          : `<div class="img-placeholder"><span>📷 Add Picture</span></div>`
+        }
+        ${artisan.verified === true ? '<span class="verified-badge">Verified</span>' : ''}
+      </div>
+      
+      <div class="artisan-info">
+        <span class="artisan-category">${artisan.category}</span>
+        <h3 class="artisan-name">${artisan.name}</h3>
+        <p class="artisan-location">📍 ${artisan.location}</p>
+        <p class="artisan-desc">${artisan.description}</p>
+        
+        <div class="card-footer-row">
+          <span class="artisan-rating">⭐ ${artisan.rating} (${artisan.reviewsCount})</span>
+          <a href="https://wa.me/${OWNER_WHATSAPP}?text=${encodeURIComponent('Hi NaijaFix, I\'m interested in ' + artisan.name + ' (' + artisan.category + ', ' + artisan.location + ')')}" class="whatsapp-btn-small" target="_blank">
+            WhatsApp
+          </a>
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
