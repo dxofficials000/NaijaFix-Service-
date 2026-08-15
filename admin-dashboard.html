@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin Dashboard — NaijaFix</title>
+<link rel="stylesheet" href="style.css">
+<style>
+  .admin-wrap { max-width: 600px; margin: 20px auto; padding: 16px; }
+  .admin-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+  #logoutBtn { background: #333; color: #fff; border: none; padding: 8px 14px; border-radius: 8px; cursor: pointer; }
+
+  .tabs { display: flex; gap: 8px; margin-bottom: 16px; }
+  .tab-btn {
+    flex: 1; padding: 10px; border-radius: 8px; border: 1px solid var(--border-color);
+    background: var(--bg-card); color: var(--text-muted); cursor: pointer; font-weight: 700;
+    position: relative;
+  }
+  .tab-btn.active { background: var(--green-primary); color: #fff; }
+  .badge {
+    position: absolute; top: -6px; right: -6px;
+    background: #ff4757; color: #fff; border-radius: 50%;
+    width: 20px; height: 20px; font-size: 0.7rem;
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  .artisan-admin-card {
+    background: var(--bg-card); border: 1px solid var(--border-color);
+    border-radius: 12px; padding: 14px; margin-bottom: 12px;
+  }
+  .artisan-admin-card h3 { margin-bottom: 4px; }
+  .artisan-admin-card p { color: var(--text-muted); font-size: 0.9rem; margin-bottom: 4px; }
+  .photo-row { display: flex; gap: 6px; overflow-x: auto; margin: 10px 0; }
+  .photo-row img { width: 70px; height: 70px; object-fit: cover; border-radius: 6px; flex-shrink: 0; }
+  .photo-row .photo-item { position: relative; flex-shrink: 0; }
+  .photo-row .del-photo {
+    position: absolute; top: -4px; right: -4px; background: #ff4757; color: #fff;
+    border: none; border-radius: 50%; width: 18px; height: 18px; font-size: 10px; cursor: pointer;
+  }
+  .action-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+  .action-row button {
+    padding: 8px 12px; border-radius: 8px; border: none; cursor: pointer; font-size: 0.85rem; font-weight: 700;
+  }
+  .btn-verify { background: var(--green-primary); color: #fff; }
+  .btn-verify.unverify { background: #555; color: #fff; }
+  .btn-active { background: #2b6cb0; color: #fff; }
+  .btn-delete { background: #ff4757; color: #fff; }
+
+  .notif-item {
+    background: var(--bg-card); border: 1px solid var(--border-color);
+    border-radius: 10px; padding: 12px; margin-bottom: 10px; font-size: 0.9rem;
+  }
+  .notif-item.unread { border-left: 3px solid var(--green-primary); }
+  .notif-time { color: var(--text-muted); font-size: 0.75rem; margin-top: 4px; }
+
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+</style>
+</head>
+<body>
+
+<div class="admin-wrap">
+  <div class="admin-header">
+    <h2>Admin Dashboard</h2>
+    <button id="logoutBtn">Log Out</button>
+  </div>
+
+  <div class="tabs">
+    <button class="tab-btn active" data-tab="listings">Listings</button>
+    <button class="tab-btn" data-tab="notifications">
+      Notifications
+      <span class="badge" id="notifBadge" style="display:none;">0</span>
+    </button>
+  </div>
+
+  <div id="listingsTab" class="tab-content active">
+    <div id="artisanList">Loading listings...</div>
+  </div>
+
+  <div id="notificationsTab" class="tab-content">
+    <div id="notifList">Loading notifications...</div>
+  </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script>
+  const ADMIN_EMAIL = "dxofficials000@gmail.com";
+
+  auth.onAuthStateChanged(user => {
+    if (!user || user.email !== ADMIN_EMAIL) {
+      window.location.href = "admin-login.html";
+      return;
+    }
+    loadListings();
+    loadNotifications();
+  });
+
+  document.getElementById("logoutBtn").addEventListener("click", async () => {
+    await auth.signOut();
+    window.location.href = "admin-login.html";
+  });
+
+  // ---------- Tabs ----------
+  document.querySelectorAll(".tab-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+      document.querySelectorAll(".tab-content").forEach(c => c.classList.remove("active"));
+      btn.classList.add("active");
+      document.getElementById(btn.dataset.tab + "Tab").classList.add("active");
+      if (btn.dataset.tab === "notifications") markAllNotificationsRead();
+    });
+  });
+
+  // ---------- Listings ----------
+  async function loadListings() {
+    const listEl = document.getElementById("artisanList");
+    const snapshot = await db.collection("artisans").orderBy("createdAt", "desc").get();
+
+    if (snapshot.empty) {
+      listEl.innerHTML = "<p>No artisan listings yet.</p>";
+      return;
+    }
+
+    listEl.innerHTML = "";
+    snapshot.forEach(doc => {
+      const a = doc.data();
+      const id = doc.id;
+      const card = document.createElement("div");
+      card.className = "artisan-admin-card";
+      card.innerHTML = `
+        <h3>${a.name || "(No name yet)"}</h3>
+        <p>${a.category || "-"} • 📍 ${a.location || "-"}</p>
+        <p>📞 ${a.phone || "-"}</p>
+        <p>${a.description || ""}</p>
+        <div class="photo-row" id="photos-${id}">
+          ${(a.images || []).map((url, i) => `
+            <div class="photo-item">
+              <img src="${url}">
+              <button class="del-photo" data-id="${id}" data-i="${i}">✕</button>
+            </div>
+          `).join("") || "<span style='color:var(--text-muted); font-size:0.85rem;'>No photos uploaded</span>"}
+        </div>
+        <div class="action-row">
+          <button class="btn-verify ${a.verified ? 'unverify' : ''}" data-id="${id}" data-verified="${a.verified}">
+            ${a.verified ? "Remove Verified" : "Mark Verified"}
+          </button>
+          <button class="btn-active" data-id="${id}" data-active="${a.active !== false}">
+            ${a.active !== false ? "Deactivate Listing" : "Reactivate Listing"}
+          </button>
+          <button class="btn-delete" data-id="${id}">Delete Listing</button>
+        </div>
+      `;
+      listEl.appendChild(card);
+    });
+
+    attachListingActions();
+  }
+
+  function attachListingActions() {
+    document.querySelectorAll(".del-photo").forEach(btn => {
+      btn.addEventListener("click", async (e) => {
+        const id = e.target.dataset.id;
+        const i = parseInt(e.target.dataset.i);
+        if (!confirm("Remove this photo?")) return;
+        const doc = await db.collection("artisans").doc(id).get();
+        const images = doc.data().images || [];
+        images.splice(i, 1);
+        await db.collection("artisans").doc(id).update({
+          images,
+          image: images[0] || ""
+        });
+        loadListings();
+      });
+    });
+
+    document.querySelectorAll(".btn-verify").forEach(btn => {
+      btn.addEventListener("click", async (e) => {
+        const id = e.target.dataset.id;
+        const currentlyVerified = e.target.dataset.verified === "true";
+        await db.collection("artisans").doc(id).update({ verified: !currentlyVerified });
+        loadListings();
+      });
+    });
+
+    document.querySelectorAll(".btn-active").forEach(btn => {
+      btn.addEventListener("click", async (e) => {
+        const id = e.target.dataset.id;
+        const currentlyActive = e.target.dataset.active === "true";
+        await db.collection("artisans").doc(id).update({ active: !currentlyActive });
+        loadListings();
+      });
+    });
+
+    document.querySelectorAll(".btn-delete").forEach(btn => {
+      btn.addEventListener("click", async (e) => {
+        const id = e.target.dataset.id;
+        if (!confirm("Permanently delete this listing? This cannot be undone.")) return;
+        await db.collection("artisans").doc(id).delete();
+        loadListings();
+      });
+    });
+  }
+
+  // ---------- Notifications ----------
+  async function loadNotifications() {
+    const notifEl = document.getElementById("notifList");
+    const badge = document.getElementById("notifBadge");
+
+    const snapshot = await db.collection("notifications").orderBy("createdAt", "desc").limit(50).get();
+
+    if (snapshot.empty) {
+      notifEl.innerHTML = "<p>No notifications yet.</p>";
+      badge.style.display = "none";
+      return;
+    }
+
+    let unreadCount = 0;
+    notifEl.innerHTML = "";
+    snapshot.forEach(doc => {
+      const n = doc.data();
+      if (!n.read) unreadCount++;
+      const time = n.createdAt ? n.createdAt.toDate().toLocaleString() : "";
+      const item = document.createElement("div");
+      item.className = "notif-item" + (n.read ? "" : " unread");
+      item.innerHTML = `<div>${n.message}</div><div class="notif-time">${time}</div>`;
+      notifEl.appendChild(item);
+    });
+
+    if (unreadCount > 0) {
+      badge.style.display = "flex";
+      badge.innerText = unreadCount;
+    } else {
+      badge.style.display = "none";
+    }
+  }
+
+  async function markAllNotificationsRead() {
+    const snapshot = await db.collection("notifications").where("read", "==", false).get();
+    const batch = db.batch();
+    snapshot.forEach(doc => batch.update(doc.ref, { read: true }));
+    await batch.commit();
+    document.getElementById("notifBadge").style.display = "none";
+  }
+
+  // Refresh notification badge every 30s while on the page (simple polling,
+  // since we're not setting up real push notifications yet)
+  setInterval(loadNotifications, 30000);
+</script>
+
+</body>
+</html>
