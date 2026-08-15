@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NaijaFix - Hire trusted hands anytime</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="manifest" href="manifest.json">
+</head>
+<body>
+
+  <header>
+    <a href="index.html" class="logo">NaijaFix</a>
+    <button class="hamburger-btn" id="hamburgerBtn" aria-label="Open Navigation">☰</button>
+  </header>
+
+  <div class="nav-drawer" id="navDrawer">
+    <button class="close-btn" id="closeBtn" aria-label="Close Navigation">&times;</button>
+    <a href="index.html">Home</a>
+    <a href="search.html">Browse Directory</a>
+    <a href="register.html">Register Professional </a>
+    <a href="advertise.html">Advertise / Sponsor</a>
+    <a href="safety.html">Safety Tips</a>
+    <a href="artisan-login.html">Artisan Login</a>
+  </div>
+
+  <main>
+    
+    <section class="banner-slider" id="bannerSlider">
+      </section>
+
+    <section class="hero">
+      <h1>Hire trusted <span>hands anytime</span></h1>
+      <p>Connect directly with verified local professionals near you via WhatsApp.</p>
+      
+      <div class="search-box-container">
+        <input type="text" id="homeSearchInput" placeholder="Search service, name, or location...">
+        <button class="btn-gold" id="homeSearchBtn" style="width: auto;">Search</button>
+      </div>
+    </section>
+
+    <div class="category-scroll" id="categoryScroll">
+      </div>
+
+    <section class="section">
+      <h2 class="section-title">Verified & <span>Featured Professionals</span></h2>
+      <div class="artisan-grid" id="featuredGrid">
+        </div>
+    </section>
+
+    <section class="about-box">
+      <h2 class="section-title">About <span>NaijaFix</span></h2>
+      <p class="about-text-lead">
+        <strong>NaijaFix</strong> is your ultimate digital platform built to bridge the gap between everyday clients and top-tier local artisans. We ensure fast, reliable, and secure service delivery without hidden fees.
+      </p>
+      <div class="about-grid">
+        <div class="about-card">
+          <h3>What We Offer</h3>
+          <p>Access to a carefully curated directory of skilled technicians, tailors, plumbers, electricians, and independent specialists ready to work.</p>
+        </div>
+        <div class="about-card">
+          <h3>Our Mission</h3>
+          <p>To empower local professionals while providing households and businesses with instant, safe, and direct communication through WhatsApp.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="support-section">
+      <div class="support-card">
+        <h3>Customer Care, Support & Inquiries</h3>
+        <p>Have questions, need support, or want to book an advertisement slot? Speak directly with our representative on WhatsApp.</p>
+        <a href="https://wa.me/2349135580184" class="whatsapp-btn-support" target="_blank">
+          💬 Chat with Customer Care / Support on WhatsApp
+        </a>
+      </div>
+    </section>
+
+  </main>
+
+  <footer>
+    <p>&copy; 2026 NaijaFix Ecosystem. All rights reserved. • Created by DXofficials</p>
+  </footer>
+
+  <script src="data.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+  <script src="firebase-config-public.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
